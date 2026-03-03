@@ -31,32 +31,35 @@ fi
 
 USER_HOME=$(getent passwd "$ACTUAL_USER" | cut -d: -f6)
 USER_ID=$(getent passwd "$ACTUAL_USER" | cut -d: -f3)
+RUNTIME_DIR="/run/user/$USER_ID"
+
+# Helper for running commands as the user with correct environment
+USER_CMD="sudo -u $ACTUAL_USER -H XDG_RUNTIME_DIR=$RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS=unix:path=$RUNTIME_DIR/bus"
 
 echo -e "${BLUE}Installing for user: ${GREEN}$ACTUAL_USER${BLUE} (Home: $USER_HOME)${NC}"
 
 # 3. Dependencies
 echo -e "${BLUE}[1/7] Installing system dependencies...${NC}"
-apt update && apt install -y build-essential git libwayland-dev libxkbcommon-dev \
-               libdbus-1-dev wtype wl-clipboard pkg-config
+apt update && apt install -y build-essential git libwayland-dev libxkbcommon-dev                libdbus-1-dev wtype wl-clipboard pkg-config
 echo -e "${GREEN}✓ Dependencies installed.${NC}"
 
 # 4. Rust Nightly
 echo -e "${BLUE}[2/7] Configuring Rust Nightly...${NC}"
-sudo -u "$ACTUAL_USER" -H bash -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y" || true
-sudo -u "$ACTUAL_USER" -H bash -c "source $USER_HOME/.cargo/env && rustup toolchain install nightly && rustup default nightly"
+$USER_CMD bash -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y" || true
+$USER_CMD bash -c "source $USER_HOME/.cargo/env && rustup toolchain install nightly && rustup default nightly"
 echo -e "${GREEN}✓ Rust ready.${NC}"
 
 # 5. Ringboard
 echo -e "${BLUE}[3/7] Installing Ringboard Suite...${NC}"
-sudo -u "$ACTUAL_USER" -H bash -c "source $USER_HOME/.cargo/env && cargo install --force ringboard-server ringboard-wayland ringboard-egui"
+$USER_CMD bash -c "source $USER_HOME/.cargo/env && cargo install --force ringboard-server ringboard-wayland ringboard-egui"
 echo -e "${GREEN}✓ Ringboard ready.${NC}"
 
 # 6. wl-clip-persist
 echo -e "${BLUE}[4/7] Installing wl-clip-persist...${NC}"
 TMP_BUILD="/tmp/clipboard-pro-build-$(date +%s)"
-sudo -u "$ACTUAL_USER" -H mkdir -p "$TMP_BUILD"
-sudo -u "$ACTUAL_USER" -H git clone https://github.com/Linus789/wl-clip-persist.git "$TMP_BUILD"
-sudo -u "$ACTUAL_USER" -H bash -c "source $USER_HOME/.cargo/env && cd $TMP_BUILD && cargo build --release"
+$USER_CMD mkdir -p "$TMP_BUILD"
+$USER_CMD git clone https://github.com/Linus789/wl-clip-persist.git "$TMP_BUILD"
+$USER_CMD bash -c "source $USER_HOME/.cargo/env && cd $TMP_BUILD && cargo build --release"
 cp "$TMP_BUILD/target/release/wl-clip-persist" /usr/local/bin/
 chmod +x /usr/local/bin/wl-clip-persist
 rm -rf "$TMP_BUILD"
@@ -69,9 +72,9 @@ if ! grep -q "COSMIC_DATA_CONTROL_ENABLED=1" /etc/environment; then
 fi
 
 SYSTEMD_DIR="$USER_HOME/.config/systemd/user"
-sudo -u "$ACTUAL_USER" mkdir -p "$SYSTEMD_DIR"
+$USER_CMD mkdir -p "$SYSTEMD_DIR"
 
-cat <<EOF > "$SYSTEMD_DIR/wl-clip-persist.service"
+cat <<EOM > "$SYSTEMD_DIR/wl-clip-persist.service"
 [Unit]
 Description=Wayland Clipboard Persistence
 After=graphical-session.target
@@ -80,12 +83,12 @@ ExecStart=/usr/local/bin/wl-clip-persist --clipboard regular
 Restart=always
 [Install]
 WantedBy=graphical-session.target
-EOF
+EOM
 
 RAM_DB="/run/user/$USER_ID/clipboard-history-ram"
-sudo -u "$ACTUAL_USER" mkdir -p "$RAM_DB"
+$USER_CMD mkdir -p "$RAM_DB"
 
-cat <<EOF > "$SYSTEMD_DIR/ringboard-server.service"
+cat <<EOM > "$SYSTEMD_DIR/ringboard-server.service"
 [Unit]
 Description=Ringboard Server (RAM Mode)
 After=graphical-session.target
@@ -94,9 +97,9 @@ ExecStart=$USER_HOME/.cargo/bin/ringboard-server --database $RAM_DB
 Restart=always
 [Install]
 WantedBy=graphical-session.target
-EOF
+EOM
 
-cat <<EOF > "$SYSTEMD_DIR/ringboard-wayland.service"
+cat <<EOM > "$SYSTEMD_DIR/ringboard-wayland.service"
 [Unit]
 Description=Ringboard Wayland Listener
 After=ringboard-server.service
@@ -105,34 +108,35 @@ ExecStart=$USER_HOME/.cargo/bin/ringboard-wayland
 Restart=always
 [Install]
 WantedBy=graphical-session.target
-EOF
+EOM
 
 # 8. Master Script
 BIN_DIR="$USER_HOME/.local/bin"
-sudo -u "$ACTUAL_USER" mkdir -p "$BIN_DIR"
-cat <<EOF > "$BIN_DIR/paste-master.sh"
+$USER_CMD mkdir -p "$BIN_DIR"
+cat <<EOM > "$BIN_DIR/paste-master.sh"
 #!/bin/bash
-USER_ID=\$(id -u)
+USER_ID=\1000
 RAM_DB="/run/user/\$USER_ID/clipboard-history-ram"
-OLD_SIG=\$( (wl-paste --type text 2>/dev/null; wl-paste --list-types 2>/dev/null) | sha1sum || echo "empty")
+OLD_SIG=\4ea0b6dc2de69f1cd84623868d680fdd6347e785  -
 $USER_HOME/.cargo/bin/ringboard-egui --database "\$RAM_DB"
 sleep 0.2
-NEW_SIG=\$( (wl-paste --type text 2>/dev/null; wl-paste --list-types 2>/dev/null) | sha1sum || echo "empty")
+NEW_SIG=\4ea0b6dc2de69f1cd84623868d680fdd6347e785  -
 if [ "\$OLD_SIG" != "\$NEW_SIG" ]; then
     wtype -M ctrl v
 fi
-EOF
+EOM
 chmod +x "$BIN_DIR/paste-master.sh"
 chown "$ACTUAL_USER:$ACTUAL_USER" "$BIN_DIR/paste-master.sh"
 
-sudo -u "$ACTUAL_USER" -H bash -c "systemctl --user daemon-reload"
-sudo -u "$ACTUAL_USER" -H bash -c "systemctl --user enable wl-clip-persist.service ringboard-server.service ringboard-wayland.service"
+$USER_CMD bash -c "systemctl --user daemon-reload"
+$USER_CMD bash -c "systemctl --user enable wl-clip-persist.service ringboard-server.service ringboard-wayland.service"
+$USER_CMD bash -c "systemctl --user restart wl-clip-persist.service ringboard-server.service ringboard-wayland.service"
 
 # 9. Shortcut
 echo -e "${BLUE}[6/7] Automating Keyboard Shortcut (Super + V)...${NC}"
 SHORTCUT_FILE="$USER_HOME/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1/custom"
-sudo -u "$ACTUAL_USER" mkdir -p "$(dirname "$SHORTCUT_FILE")"
-cat <<EOF > "$SHORTCUT_FILE"
+$USER_CMD mkdir -p "$(dirname "$SHORTCUT_FILE")"
+cat <<EOM > "$SHORTCUT_FILE"
 {
     (
         modifiers: [
@@ -142,7 +146,7 @@ cat <<EOF > "$SHORTCUT_FILE"
         description: Some("Clipboard Pro"),
     ): Spawn("$BIN_DIR/paste-master.sh"),
 }
-EOF
+EOM
 
 echo -e "${GREEN}✓ All steps complete!${NC}"
 echo -e "${BLUE}[7/7] Finalizing...${NC}"
