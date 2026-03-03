@@ -20,24 +20,24 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-echo -e "${BLUE}[1/6] Installing system dependencies...${NC}"
+echo -e "${BLUE}[1/7] Installing system dependencies...${NC}"
 apt update
 apt install -y build-essential git libwayland-dev libxkbcommon-dev \
                libdbus-1-dev wtype wl-clipboard pkg-config
 echo -e "${GREEN}✓ Dependencies installed.${NC}"
 
-echo -e "${BLUE}[2/6] Configuring Rust Nightly...${NC}"
+echo -e "${BLUE}[2/7] Configuring Rust Nightly...${NC}"
 USER_HOME=$(eval echo "~$SUDO_USER")
 USER_ID=$(id -u "$SUDO_USER")
 sudo -u "$SUDO_USER" -H bash -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
 sudo -u "$SUDO_USER" -H bash -c "source \$HOME/.cargo/env && rustup toolchain install nightly && rustup default nightly"
 echo -e "${GREEN}✓ Rust ready.${NC}"
 
-echo -e "${BLUE}[3/6] Installing Ringboard Suite...${NC}"
+echo -e "${BLUE}[3/7] Installing Ringboard Suite...${NC}"
 sudo -u "$SUDO_USER" -H bash -c "source \$HOME/.cargo/env && cargo install ringboard-server ringboard-wayland ringboard-egui"
 echo -e "${GREEN}✓ Ringboard ready.${NC}"
 
-echo -e "${BLUE}[4/6] Installing wl-clip-persist...${NC}"
+echo -e "${BLUE}[4/7] Installing wl-clip-persist...${NC}"
 TMP_DIR=$(mktemp -d)
 sudo -u "$SUDO_USER" git clone https://github.com/Linus789/wl-clip-persist.git "$TMP_DIR"
 cd "$TMP_DIR"
@@ -47,7 +47,7 @@ chmod +x /usr/local/bin/wl-clip-persist
 rm -rf "$TMP_DIR"
 echo -e "${GREEN}✓ wl-clip-persist ready.${NC}"
 
-echo -e "${BLUE}[5/6] Configuring Universal Background RAM Services...${NC}"
+echo -e "${BLUE}[5/7] Configuring Universal Background RAM Services...${NC}"
 
 # Set COSMIC_DATA_CONTROL_ENABLED
 if ! grep -q "COSMIC_DATA_CONTROL_ENABLED=1" /etc/environment; then
@@ -124,6 +124,25 @@ sudo -u "$SUDO_USER" -H bash -c "systemctl --user enable wl-clip-persist.service
 
 echo -e "${GREEN}✓ Universal services ready.${NC}"
 
-echo -e "${BLUE}[6/6] Finalizing...${NC}"
+# 6. Automate Keyboard Shortcut (Super + V)
+echo -e "${BLUE}[6/7] Automating Keyboard Shortcut (Super + V)...${NC}"
+SHORTCUT_FILE="$USER_HOME/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1/custom"
+sudo -u "$SUDO_USER" mkdir -p "$(dirname "$SHORTCUT_FILE")"
+
+# We use a simple RON (Rusty Object Notation) template for COSMIC
+cat <<EOF > "$SHORTCUT_FILE"
+{
+    (
+        modifiers: [
+            Super,
+        ],
+        key: "v",
+        description: Some("Clipboard Pro"),
+    ): Spawn("$BIN_DIR/paste-master.sh"),
+}
+EOF
+echo -e "${GREEN}✓ Super + V shortcut automated.${NC}"
+
+echo -e "${BLUE}[7/7] Finalizing...${NC}"
 echo -e "${GREEN}🎉 UNIVERSAL INSTALLATION COMPLETE!${NC}"
-echo -e "Your history is now 100% in RAM. It will be wiped every reboot! 🥂"
+echo -e "Your history is now 100% in RAM and Super+V is set! Reboot and enjoy! 🥂"

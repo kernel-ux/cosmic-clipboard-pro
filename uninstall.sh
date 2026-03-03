@@ -26,13 +26,13 @@ USER_HOME=$(eval echo "~$SUDO_USER")
 USER_SYSTEMD_DIR="$USER_HOME/.config/systemd/user"
 
 # 2. Stop and Disable Systemd Services
-echo -e "${BLUE}[1/4] Stopping background services...${NC}"
+echo -e "${BLUE}[1/5] Stopping background services...${NC}"
 sudo -u "$SUDO_USER" -H bash -c "systemctl --user stop wl-clip-persist.service ringboard-server.service ringboard-wayland.service" || true
 sudo -u "$SUDO_USER" -H bash -c "systemctl --user disable wl-clip-persist.service ringboard-server.service ringboard-wayland.service" || true
 echo -e "${GREEN}✓ Services stopped and disabled.${NC}"
 
 # 3. Remove Binary and Script Files
-echo -e "${BLUE}[2/4] Removing installed files...${NC}"
+echo -e "${BLUE}[2/5] Removing installed files...${NC}"
 rm -f /usr/local/bin/wl-clip-persist
 rm -f "$USER_HOME/.local/bin/paste-master.sh"
 rm -f "$USER_SYSTEMD_DIR/wl-clip-persist.service"
@@ -40,13 +40,19 @@ rm -f "$USER_SYSTEMD_DIR/ringboard-server.service"
 rm -f "$USER_SYSTEMD_DIR/ringboard-wayland.service"
 echo -e "${GREEN}✓ Files removed.${NC}"
 
-# 4. Clean up Environment Variables
-echo -e "${BLUE}[3/4] Cleaning environment variables...${NC}"
+# 4. Remove Custom Keyboard Shortcut
+echo -e "${BLUE}[3/5] Removing keyboard shortcut...${NC}"
+SHORTCUT_FILE="$USER_HOME/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1/custom"
+rm -f "$SHORTCUT_FILE"
+echo -e "${GREEN}✓ Shortcut removed.${NC}"
+
+# 5. Clean up Environment Variables
+echo -e "${BLUE}[4/5] Cleaning environment variables...${NC}"
 sed -i '/COSMIC_DATA_CONTROL_ENABLED=1/d' /etc/environment
 echo -e "${GREEN}✓ Environment cleaned.${NC}"
 
-# 5. Finalize
-echo -e "${BLUE}[4/4] Finalizing cleanup...${NC}"
+# 6. Finalize
+echo -e "${BLUE}[5/5] Finalizing cleanup...${NC}"
 sudo -u "$SUDO_USER" -H bash -c "systemctl --user daemon-reload"
 
 echo -e "${GREEN}====================================================${NC}"

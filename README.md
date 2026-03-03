@@ -18,7 +18,7 @@ Most clipboard scripts only handle text. **We handle it all.**
 Your data stays in your RAM, never on your disk.
 - **Volatile Storage:** History is stored in **System RAM** (`/run/user/`).
 - **Total Wipe on Reboot:** Your history is physically erased every time you restart.
-- **Zero Trace:** Maximum privacy with zero footprint.
+- **Zero Disk Trace:** Your secret notes and passwords never touch your hard drive. It's the ultimate "Invisible Security."
 
 ## ⚡ Memory Efficiency: A Lightweight Ghost
 - **Low Footprint:** Uses less than **10MB** of RAM.
@@ -31,13 +31,14 @@ Your data stays in your RAM, never on your disk.
 - **Silent Persistence:** Copy something, close the app, and it **stays** in your clipboard.
 - **Windows-Style History (`Win + V`):** A beautiful, searchable list of your previous copies.
 - **Smart Auto-Paste:** Select an item (text, image, or GIF) and it automatically pastes.
+- **Zero Setup:** The installer **automatically configures your Super + V shortcut** for you.
 
 ---
 
 ## 🚀 Installation
 1. **Clone it:**
    ```bash
-   git clone https://github.com/YOUR_USERNAME/cosmic-clipboard-pro.git
+   git clone https://github.com/kernel-ux/cosmic-clipboard-pro.git
    cd cosmic-clipboard-pro
    ```
 2. **Run the Universal Installer:**
@@ -45,7 +46,7 @@ Your data stays in your RAM, never on your disk.
    chmod +x install.sh
    pkexec ./install.sh
    ```
-3. **Restart & Enjoy.** (Set your `Win + V` shortcut to `/home/USER/.local/bin/paste-master.sh`)
+3. **Restart & Enjoy.** (Super+V is already set for you!)
 
 ---
 Built with ❤️ by **Jeevan** (2026)
