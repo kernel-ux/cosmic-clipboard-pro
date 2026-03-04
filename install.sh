@@ -96,6 +96,7 @@ cat <<EOM > "$SYSTEMD_DIR/ringboard-server.service"
 Description=Ringboard Server (RAM Mode)
 
 [Service]
+ExecStartPre=/usr/bin/mkdir -p /run/user/%U/clipboard-history-ram
 ExecStart=$USER_HOME/.cargo/bin/ringboard-server --database $RAM_DB
 Restart=always
 
