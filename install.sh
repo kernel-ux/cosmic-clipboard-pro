@@ -32,6 +32,7 @@ fi
 USER_HOME=$(getent passwd "$ACTUAL_USER" | cut -d: -f6)
 USER_ID=$(getent passwd "$ACTUAL_USER" | cut -d: -f3)
 RUNTIME_DIR="/run/user/$USER_ID"
+RAM_DB="$RUNTIME_DIR/clipboard-history-ram"
 
 # Helper for running commands as the user with correct environment
 USER_CMD="sudo -u $ACTUAL_USER -H XDG_RUNTIME_DIR=$RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS=unix:path=$RUNTIME_DIR/bus"
@@ -75,31 +76,24 @@ fi
 SYSTEMD_DIR="$USER_HOME/.config/systemd/user"
 $USER_CMD mkdir -p "$SYSTEMD_DIR"
 
-# Independent services to avoid ordering loops
 cat <<EOM > "$SYSTEMD_DIR/wl-clip-persist.service"
 [Unit]
 Description=Wayland Clipboard Persistence
-
+After=graphical-session.target
 [Service]
 ExecStart=/usr/local/bin/wl-clip-persist --clipboard regular
 Restart=always
-
 [Install]
 WantedBy=default.target
 EOM
 
-RAM_DB="/run/user/$USER_ID/clipboard-history-ram"
-$USER_CMD mkdir -p "$RAM_DB"
-
 cat <<EOM > "$SYSTEMD_DIR/ringboard-server.service"
 [Unit]
 Description=Ringboard Server (RAM Mode)
-
 [Service]
-ExecStartPre=/usr/bin/mkdir -p /run/user/%U/clipboard-history-ram
+ExecStartPre=/usr/bin/mkdir -p $RAM_DB
 ExecStart=$USER_HOME/.cargo/bin/ringboard-server --database $RAM_DB
 Restart=always
-
 [Install]
 WantedBy=default.target
 EOM
@@ -108,11 +102,9 @@ cat <<EOM > "$SYSTEMD_DIR/ringboard-wayland.service"
 [Unit]
 Description=Ringboard Wayland Listener
 After=ringboard-server.service
-
 [Service]
 ExecStart=$USER_HOME/.cargo/bin/ringboard-wayland
 Restart=always
-
 [Install]
 WantedBy=default.target
 EOM
@@ -123,9 +115,9 @@ $USER_CMD mkdir -p "$BIN_DIR"
 cat <<'EOM' > "$BIN_DIR/paste-master.sh"
 #!/bin/bash
 USER_ID=$(id -u)
-RAM_DB="/run/user/$USER_ID/clipboard-history-ram"
+RAM_DIR="/run/user/$USER_ID/clipboard-history-ram"
 OLD_SIG=$( (wl-paste --type text 2>/dev/null; wl-paste --list-types 2>/dev/null) | sha1sum || echo "empty")
-ringboard-egui --database "$RAM_DB"
+ringboard-egui --database "$RAM_DIR"
 sleep 0.2
 NEW_SIG=$( (wl-paste --type text 2>/dev/null; wl-paste --list-types 2>/dev/null) | sha1sum || echo "empty")
 if [ "$OLD_SIG" != "$NEW_SIG" ]; then
