@@ -75,15 +75,17 @@ fi
 SYSTEMD_DIR="$USER_HOME/.config/systemd/user"
 $USER_CMD mkdir -p "$SYSTEMD_DIR"
 
+# Independent services to avoid ordering loops
 cat <<EOM > "$SYSTEMD_DIR/wl-clip-persist.service"
 [Unit]
 Description=Wayland Clipboard Persistence
-After=graphical-session.target
+
 [Service]
 ExecStart=/usr/local/bin/wl-clip-persist --clipboard regular
 Restart=always
+
 [Install]
-WantedBy=graphical-session.target
+WantedBy=default.target
 EOM
 
 RAM_DB="/run/user/$USER_ID/clipboard-history-ram"
@@ -92,23 +94,26 @@ $USER_CMD mkdir -p "$RAM_DB"
 cat <<EOM > "$SYSTEMD_DIR/ringboard-server.service"
 [Unit]
 Description=Ringboard Server (RAM Mode)
-After=graphical-session.target
+
 [Service]
 ExecStart=$USER_HOME/.cargo/bin/ringboard-server --database $RAM_DB
 Restart=always
+
 [Install]
-WantedBy=graphical-session.target
+WantedBy=default.target
 EOM
 
 cat <<EOM > "$SYSTEMD_DIR/ringboard-wayland.service"
 [Unit]
 Description=Ringboard Wayland Listener
 After=ringboard-server.service
+
 [Service]
 ExecStart=$USER_HOME/.cargo/bin/ringboard-wayland
 Restart=always
+
 [Install]
-WantedBy=graphical-session.target
+WantedBy=default.target
 EOM
 
 # 8. Master Script
@@ -131,7 +136,9 @@ chown "$ACTUAL_USER:$ACTUAL_USER" "$BIN_DIR/paste-master.sh"
 
 $USER_CMD bash -c "systemctl --user daemon-reload"
 $USER_CMD bash -c "systemctl --user enable wl-clip-persist.service ringboard-server.service ringboard-wayland.service"
-$USER_CMD bash -c "systemctl --user restart wl-clip-persist.service ringboard-server.service ringboard-wayland.service"
+$USER_CMD bash -c "systemctl --user restart ringboard-server.service"
+sleep 1
+$USER_CMD bash -c "systemctl --user restart ringboard-wayland.service wl-clip-persist.service"
 
 # 9. Shortcut
 echo -e "${BLUE}[6/7] Automating Keyboard Shortcut (Super + V)...${NC}"
