@@ -40,11 +40,12 @@ echo -e "${BLUE}Installing for user: ${GREEN}$ACTUAL_USER${BLUE} (Home: $USER_HO
 
 # 3. Dependencies
 echo -e "${BLUE}[1/7] Installing system dependencies...${NC}"
-apt update && apt install -y build-essential git libwayland-dev libxkbcommon-dev                libdbus-1-dev wtype wl-clipboard pkg-config
+apt update && apt install -y build-essential git libwayland-dev libxkbcommon-dev \
+               libdbus-1-dev wtype wl-clipboard pkg-config
 echo -e "${GREEN}✓ Dependencies installed.${NC}"
 
 # 4. Rust Nightly
-echo -e "${BLUE}[2/7] Configuring Rust Nightly...\"
+echo -e "${BLUE}[2/7] Configuring Rust Nightly...${NC}"
 $USER_CMD bash -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y" || true
 $USER_CMD bash -c "source $USER_HOME/.cargo/env && rustup toolchain install nightly && rustup default nightly"
 echo -e "${GREEN}✓ Rust ready.${NC}"
