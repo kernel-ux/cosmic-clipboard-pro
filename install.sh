@@ -33,6 +33,9 @@ USER_HOME=$(getent passwd "$ACTUAL_USER" | cut -d: -f6)
 USER_ID=$(getent passwd "$ACTUAL_USER" | cut -d: -f3)
 RUNTIME_DIR="/run/user/$USER_ID"
 RAM_DB="$RUNTIME_DIR/clipboard-history-ram"
+# Force all data to RAM by replacing the default folder with a symlink
+sudo -u "$ACTUAL_USER" rm -rf "$USER_HOME/.local/share/clipboard-history"
+sudo -u "$ACTUAL_USER" ln -s "$RAM_DB" "$USER_HOME/.local/share/clipboard-history"
 
 # Helper for running commands as the user with correct environment
 USER_CMD="sudo -u $ACTUAL_USER -H XDG_RUNTIME_DIR=$RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS=unix:path=$RUNTIME_DIR/bus"
