@@ -44,7 +44,7 @@ apt update && apt install -y build-essential git libwayland-dev libxkbcommon-dev
 echo -e "${GREEN}✓ Dependencies installed.${NC}"
 
 # 4. Rust Nightly
-echo -e "${BLUE}[2/7] Configuring Rust Nightly...${NC}"
+echo -e "${BLUE}[2/7] Configuring Rust Nightly...\"
 $USER_CMD bash -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y" || true
 $USER_CMD bash -c "source $USER_HOME/.cargo/env && rustup toolchain install nightly && rustup default nightly"
 echo -e "${GREEN}✓ Rust ready.${NC}"
@@ -113,15 +113,15 @@ EOM
 # 8. Master Script
 BIN_DIR="$USER_HOME/.local/bin"
 $USER_CMD mkdir -p "$BIN_DIR"
-cat <<EOM > "$BIN_DIR/paste-master.sh"
+cat <<'EOM' > "$BIN_DIR/paste-master.sh"
 #!/bin/bash
-USER_ID=\1000
-RAM_DB="/run/user/\$USER_ID/clipboard-history-ram"
-OLD_SIG=\4ea0b6dc2de69f1cd84623868d680fdd6347e785  -
-$USER_HOME/.cargo/bin/ringboard-egui --database "\$RAM_DB"
+USER_ID=$(id -u)
+RAM_DB="/run/user/$USER_ID/clipboard-history-ram"
+OLD_SIG=$( (wl-paste --type text 2>/dev/null; wl-paste --list-types 2>/dev/null) | sha1sum || echo "empty")
+ringboard-egui --database "$RAM_DB"
 sleep 0.2
-NEW_SIG=\4ea0b6dc2de69f1cd84623868d680fdd6347e785  -
-if [ "\$OLD_SIG" != "\$NEW_SIG" ]; then
+NEW_SIG=$( (wl-paste --type text 2>/dev/null; wl-paste --list-types 2>/dev/null) | sha1sum || echo "empty")
+if [ "$OLD_SIG" != "$NEW_SIG" ]; then
     wtype -M ctrl v
 fi
 EOM
