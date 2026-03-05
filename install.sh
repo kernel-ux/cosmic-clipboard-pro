@@ -23,10 +23,12 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # 2. Precise User Detection
-if [ "$SUDO_USER" ]; then
-    ACTUAL_USER=$SUDO_USER
+if [ -n "${SUDO_USER:-}" ]; then
+    ACTUAL_USER="$SUDO_USER"
+elif [ -n "${PKEXEC_UID:-}" ]; then
+    ACTUAL_USER="$(id -nu "$PKEXEC_UID")"
 else
-    ACTUAL_USER=$(logname 2>/dev/null || echo $USER)
+    ACTUAL_USER=$(logname 2>/dev/null || echo "$USER")
 fi
 
 USER_HOME=$(getent passwd "$ACTUAL_USER" | cut -d: -f6)
