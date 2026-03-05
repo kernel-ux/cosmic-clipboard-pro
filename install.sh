@@ -122,15 +122,8 @@ set -euo pipefail
 USER_ID=$(id -u)
 RAM_DIR="/run/user/$USER_ID/clipboard-history-ram"
 
-# Compare a combined signature so we only auto-paste if selection changed.
-OLD_SIG=$( (wl-paste --type text 2>/dev/null; wl-paste --list-types 2>/dev/null) | sha1sum || echo "empty")
+# Open history only. User pastes manually with Ctrl+V after choosing item.
 ringboard-egui --database "$RAM_DIR" || true
-sleep 0.2
-NEW_SIG=$( (wl-paste --type text 2>/dev/null; wl-paste --list-types 2>/dev/null) | sha1sum || echo "empty")
-
-if [ "$OLD_SIG" != "$NEW_SIG" ]; then
-    wtype -M ctrl v
-fi
 EOM
 chmod +x "$BIN_DIR/paste-master.sh"
 chown "$ACTUAL_USER:$ACTUAL_USER" "$BIN_DIR/paste-master.sh"
