@@ -4,7 +4,7 @@
 # Created by Jeevan (2026)
 # ==============================================================================
 
-set -e
+set -euo pipefail
 
 # Colors
 GREEN='\033[0;32m'
@@ -36,8 +36,8 @@ USER_CMD="sudo -u $ACTUAL_USER -H XDG_RUNTIME_DIR=$RUNTIME_DIR DBUS_SESSION_BUS_
 
 # 3. Stop and Disable Services
 echo -e "${BLUE}[1/4] Stopping background services...${NC}"
-$USER_CMD bash -c "systemctl --user stop wl-clip-persist.service ringboard-server.service ringboard-wayland.service" || true
-$USER_CMD bash -c "systemctl --user disable wl-clip-persist.service ringboard-server.service ringboard-wayland.service" || true
+$USER_CMD bash -c "systemctl --user stop ringboard-server.service ringboard-wayland.service wl-clip-persist.service" || true
+$USER_CMD bash -c "systemctl --user disable ringboard-server.service ringboard-wayland.service wl-clip-persist.service" || true
 echo -e "${GREEN}✓ Services stopped.${NC}"
 
 # 4. Remove Files
@@ -52,7 +52,41 @@ echo -e "${GREEN}✓ Files removed.${NC}"
 # 5. Remove Shortcut
 echo -e "${BLUE}[3/4] Removing keyboard shortcut...${NC}"
 SHORTCUT_FILE="$USER_HOME/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1/custom"
-rm -f "$SHORTCUT_FILE"
+if [ -f "$SHORTCUT_FILE" ]; then
+  TMP_SHORTCUT="$(mktemp)"
+  awk '
+    {
+      lines[NR]=$0
+      if ($0 ~ /description:[[:space:]]*Some\("Clipboard Pro"\)/) match_line=NR
+    }
+    END {
+      if (match_line == 0) {
+        for (i=1; i<=NR; i++) print lines[i]
+        exit
+      }
+
+      start_line=0
+      for (i=match_line; i>=1; i--) {
+        if (lines[i] ~ /^[[:space:]]*\([[:space:]]*$/) { start_line=i; break }
+      }
+
+      end_line=0
+      for (i=match_line; i<=NR; i++) {
+        if (lines[i] ~ /^[[:space:]]*\):[[:space:]]*Spawn\(.*paste-master\.sh"\),?[[:space:]]*$/) { end_line=i; break }
+      }
+
+      if (start_line == 0 || end_line == 0) {
+        for (i=1; i<=NR; i++) print lines[i]
+        exit
+      }
+
+      for (i=1; i<start_line; i++) print lines[i]
+      for (i=end_line+1; i<=NR; i++) print lines[i]
+    }
+  ' "$SHORTCUT_FILE" > "$TMP_SHORTCUT"
+  mv "$TMP_SHORTCUT" "$SHORTCUT_FILE"
+  chown "$ACTUAL_USER:$ACTUAL_USER" "$SHORTCUT_FILE"
+fi
 echo -e "${GREEN}✓ Shortcut removed.${NC}"
 
 # 6. Clean Environment
