@@ -65,30 +65,52 @@ USER_CMD="sudo -u $ACTUAL_USER -H XDG_RUNTIME_DIR=$RUNTIME_DIR DBUS_SESSION_BUS_
 echo -e "${BLUE}Installing for user: ${GREEN}$ACTUAL_USER${BLUE} (Home: $USER_HOME)${NC}"
 
 # 3. Dependencies
-echo -e "${BLUE}[1/6] Installing system dependencies...${NC}"
+echo -e "${BLUE}[1/7] Installing system dependencies...${NC}"
 apt update && apt install -y build-essential git libwayland-dev libxkbcommon-dev \
                libdbus-1-dev wtype wl-clipboard pkg-config
 echo -e "${GREEN}✓ Dependencies installed.${NC}"
 
 # 4. Rust Nightly
-echo -e "${BLUE}[2/6] Configuring Rust Nightly...${NC}"
+echo -e "${BLUE}[2/7] Configuring Rust Nightly...${NC}"
 $USER_CMD bash -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y" || true
 $USER_CMD bash -c "source $USER_HOME/.cargo/env && rustup toolchain install nightly && rustup default nightly"
 echo -e "${GREEN}✓ Rust ready.${NC}"
 
 # 5. Ringboard
-echo -e "${BLUE}[3/6] Installing Ringboard Suite...${NC}"
+echo -e "${BLUE}[3/7] Installing Ringboard Suite...${NC}"
 $USER_CMD bash -c "source $USER_HOME/.cargo/env && cargo install --force ringboard-server ringboard-wayland ringboard-egui"
 echo -e "${GREEN}✓ Ringboard ready.${NC}"
 
-# 6. Services (Ringboard-only to avoid clipboard ownership races)
-echo -e "${BLUE}[4/6] Configuring Background RAM Services...${NC}"
+# 6. wl-clip-persist for direct Ctrl+V persistence of latest item
+echo -e "${BLUE}[4/7] Installing wl-clip-persist...${NC}"
+TMP_BUILD="/tmp/clipboard-pro-build-$(date +%s)"
+$USER_CMD mkdir -p "$TMP_BUILD"
+$USER_CMD git clone https://github.com/Linus789/wl-clip-persist.git "$TMP_BUILD"
+$USER_CMD bash -c "source $USER_HOME/.cargo/env && cd $TMP_BUILD && cargo build --release"
+cp "$TMP_BUILD/target/release/wl-clip-persist" /usr/local/bin/
+chmod +x /usr/local/bin/wl-clip-persist
+rm -rf "$TMP_BUILD"
+echo -e "${GREEN}✓ wl-clip-persist ready.${NC}"
+
+# 7. Services
+echo -e "${BLUE}[5/7] Configuring Background RAM Services...${NC}"
 if ! grep -q "COSMIC_DATA_CONTROL_ENABLED=1" /etc/environment; then
     echo "COSMIC_DATA_CONTROL_ENABLED=1" >> /etc/environment
 fi
 
 SYSTEMD_DIR="$USER_HOME/.config/systemd/user"
 $USER_CMD mkdir -p "$SYSTEMD_DIR"
+
+cat <<EOM > "$SYSTEMD_DIR/wl-clip-persist.service"
+[Unit]
+Description=Wayland Clipboard Persistence (latest item)
+After=graphical-session.target
+[Service]
+ExecStart=/usr/local/bin/wl-clip-persist --clipboard regular
+Restart=always
+[Install]
+WantedBy=graphical-session.target
+EOM
 
 cat <<EOM > "$SYSTEMD_DIR/ringboard-server.service"
 [Unit]
@@ -130,15 +152,14 @@ chown "$ACTUAL_USER:$ACTUAL_USER" "$BIN_DIR/paste-master.sh"
 
 $USER_CMD bash -c "systemctl --user daemon-reload"
 $USER_CMD bash -c "systemctl --user import-environment WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE" || true
-$USER_CMD bash -c "systemctl --user disable wl-clip-persist.service" || true
-$USER_CMD bash -c "systemctl --user stop wl-clip-persist.service" || true
-$USER_CMD bash -c "systemctl --user enable ringboard-server.service ringboard-wayland.service"
+$USER_CMD bash -c "systemctl --user enable wl-clip-persist.service ringboard-server.service ringboard-wayland.service"
+$USER_CMD bash -c "systemctl --user restart wl-clip-persist.service"
 $USER_CMD bash -c "systemctl --user restart ringboard-server.service"
 sleep 1
 $USER_CMD bash -c "systemctl --user restart ringboard-wayland.service"
 
 # 9. Shortcut
-echo -e "${BLUE}[5/6] Automating Keyboard Shortcut (Super + V)...${NC}"
+echo -e "${BLUE}[6/7] Automating Keyboard Shortcut (Super + V)...${NC}"
 SHORTCUT_FILE="$USER_HOME/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1/custom"
 $USER_CMD mkdir -p "$(dirname "$SHORTCUT_FILE")"
 
@@ -183,7 +204,7 @@ fi
 chown "$ACTUAL_USER:$ACTUAL_USER" "$SHORTCUT_FILE"
 
 echo -e "${GREEN}✓ All steps complete!${NC}"
-echo -e "${BLUE}[6/6] Finalizing...${NC}"
+echo -e "${BLUE}[7/7] Finalizing...${NC}"
 echo -e "${GREEN}====================================================${NC}"
 echo -e "${GREEN}🎉 UNIVERSAL INSTALLATION COMPLETE!${NC}"
 echo -e "Restart your computer and press Win+V to start! 🥂"
